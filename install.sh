@@ -1,233 +1,147 @@
 #!/bin/bash
+# ==========================================
+# iTrade 一键安装脚本
+# 自动检测架构，从 GitHub 下载并启动
+# ==========================================
+
 set -e
 
-# 颜色定义
+# --- 颜色定义 ---
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 echo -e "${GREEN}=================================================${NC}"
-echo -e "${GREEN}  iTrade.icu Docker 自动化部署脚本              ${NC}"
+echo -e "${GREEN}  iTrade 引擎自动化部署程序启动...              ${NC}"
 echo -e "${GREEN}=================================================${NC}"
-echo ""
 
 # ==========================================
-# 1. 自动识别设备 (OS & 架构)
+# 0. 权限检查
 # ==========================================
-echo -e "${BLUE}=> [1/6] 正在检测系统环境...${NC}"
-OS="$(uname -s)"
-ARCH="$(uname -m)"
-
-echo "   - 操作系统: ${OS}"
-echo "   - 系统架构: ${ARCH}"
-
-PLATFORM=""
-case "$OS" in
-    Linux)
-        case "$ARCH" in
-            x86_64) PLATFORM="linux-amd64" ;;
-            aarch64|arm64) PLATFORM="linux-arm64" ;;
-            *) 
-                echo -e "   ${RED}[错误] 不支持的架构: $ARCH${NC}"
-                exit 1 
-                ;;
-        esac
-        ;;
-    Darwin)
-        case "$ARCH" in
-            x86_64) PLATFORM="macos-amd64" ;;
-            arm64) PLATFORM="macos-arm64" ;;
-            *) 
-                echo -e "   ${RED}[错误] 不支持的架构: $ARCH${NC}"
-                exit 1 
-                ;;
-        esac
-        ;;
-    *)
-        echo -e "   ${RED}[错误] 不支持的操作系统: $OS${NC}"
-        exit 1
-        ;;
-esac
-
-echo -e "   ${GREEN}- 目标平台标识: $PLATFORM${NC}"
-echo ""
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${RED}[错误] 请使用 sudo 或 root 权限运行此脚本！${NC}"
+  echo "示例: sudo bash install.sh"
+  exit 1
+fi
 
 # ==========================================
-# 2. 检查 Python 环境
+# 1. 检查并安装 Docker & Docker Compose
 # ==========================================
-echo -e "${BLUE}=> [2/6] 检查 Python 运行环境...${NC}"
-if command -v python3 &>/dev/null; then
-    PYTHON_VERSION=$(python3 --version 2>&1)
-    echo -e "   ${GREEN}- Python3 已就绪: $PYTHON_VERSION${NC}"
+echo -e "\n${YELLOW}=> [1/5] 检查 Docker 运行环境...${NC}"
+
+if ! command -v docker &> /dev/null; then
+    echo -e "${YELLOW}未检测到 Docker，正在为您自动安装官网最新版...${NC}"
+    curl -fsSL https://get.docker.com | bash
+    systemctl enable --now docker
+    echo -e "${GREEN}Docker 安装并启动成功！${NC}"
 else
-    echo -e "   ${RED}[错误] 未检测到 Python3，请先安装 Python3。${NC}"
+    echo -e "${GREEN}Docker 已安装: $(docker --version)${NC}"
+fi
+
+if ! docker compose version &> /dev/null; then
+    echo -e "${RED}[错误] Docker Compose 插件未安装或损坏${NC}"
     exit 1
-fi
-echo ""
-
-# ==========================================
-# 3. 检查并优先安装 uv
-# ==========================================
-echo -e "${BLUE}=> [3/6] 检查包管理工具 uv...${NC}"
-if ! command -v uv &>/dev/null; then
-    echo -e "   ${YELLOW}- 未检测到 uv，正在优先安装 uv...${NC}"
-    
-    # 下载并安装 uv
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    
-    # 尝试加载环境变量以使 uv 立即生效
-    if [ -f "$HOME/.cargo/env" ]; then
-        source "$HOME/.cargo/env"
-    fi
-    
-    # 确保 PATH 包含 uv 的安装路径
-    export PATH="$HOME/.cargo/bin:$HOME/.local/bin:$PATH"
-    
-    # 验证 uv 是否可用
-    if command -v uv &>/dev/null; then
-        UV_VERSION=$(uv --version)
-        echo -e "   ${GREEN}- uv 安装成功: $UV_VERSION${NC}"
-    else
-        echo -e "   ${RED}[错误] uv 环境变量配置失败，请手动执行 'source \$HOME/.cargo/env' 后重新运行本脚本。${NC}"
-        exit 1
-    fi
 else
-    UV_VERSION=$(uv --version)
-    echo -e "   ${GREEN}- uv 已安装: $UV_VERSION${NC}"
+    echo -e "${GREEN}Docker Compose 已就绪: $(docker compose version)${NC}"
 fi
-echo ""
 
 # ==========================================
-# 4. 从 GitHub Releases 下载对应的 Docker 版本
+# 2. 自动识别系统架构
 # ==========================================
-echo -e "${BLUE}=> [4/6] 正在从 itradeicu/itrade.icu 获取最新 Release...${NC}"
-REPO="itradeicu/itrade.icu"
-API_URL="https://api.github.com/repos/$REPO/releases/latest"
+echo -e "\n${YELLOW}=> [2/5] 正在检测系统架构...${NC}"
 
-# 设置超时和重试
-MAX_RETRIES=3
-RETRY_COUNT=0
-DOWNLOAD_URL=""
+ARCH=$(uname -m)
 
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    echo "   - 尝试获取 Release 信息 (第 $RETRY_COUNT 次)..."
-    
-    # 尝试匹配当前平台的专属 docker 压缩包
-    DOWNLOAD_URL=$(curl -s --max-time 10 "$API_URL" | grep "browser_download_url" | grep -i "docker" | grep -i "$PLATFORM" | cut -d '"' -f 4 | head -n 1)
-    
-    # 回退 1: 查找通用的 docker 包
-    if [ -z "$DOWNLOAD_URL" ]; then
-        DOWNLOAD_URL=$(curl -s --max-time 10 "$API_URL" | grep "browser_download_url" | grep -i "docker" | cut -d '"' -f 4 | head -n 1)
-    fi
-    
-    # 回退 2: 直接下载源码包 (tarball)
-    if [ -z "$DOWNLOAD_URL" ]; then
-        echo -e "   ${YELLOW}- 未找到专属的 Docker 资产包，正在使用默认源码包...${NC}"
-        DOWNLOAD_URL=$(curl -s --max-time 10 "$API_URL" | grep "tarball_url" | cut -d '"' -f 4 | head -n 1)
-    fi
-    
-    if [ -n "$DOWNLOAD_URL" ]; then
-        break
-    fi
-    
-    echo -e "   ${YELLOW}- 第 $RETRY_COUNT 次尝试失败，等待 2 秒后重试...${NC}"
-    sleep 2
-done
-
-if [ -z "$DOWNLOAD_URL" ]; then
-    echo -e "   ${RED}[错误] 无法从 GitHub 获取下载链接，请检查网络连接。${NC}"
+if [ "$ARCH" = "x86_64" ]; then
+    ARCH_NAME="X64"
+    echo -e "${GREEN}✅ 检测到 X86_64 架构${NC}"
+elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+    ARCH_NAME="ARM64"
+    echo -e "${GREEN}✅ 检测到 ARM64 架构${NC}"
+else
+    echo -e "${RED}❌ 暂不支持的系统架构: $ARCH${NC}"
     exit 1
 fi
 
-echo -e "   ${GREEN}- 下载地址: $DOWNLOAD_URL${NC}"
+echo -e "${GREEN}将下载: iTrade-Docker-${ARCH_NAME}.zip${NC}"
 
-# 创建工作目录
-WORK_DIR="itrade_docker_deploy"
-mkdir -p "$WORK_DIR"
+# ==========================================
+# 3. 获取最新版本号
+# ==========================================
+echo -e "\n${YELLOW}=> [3/5] 获取最新版本...${NC}"
 
-# 下载文件
-echo -e "   ${YELLOW}- 正在下载...${NC}"
-curl -L --progress-bar -o "$WORK_DIR/release.tar.gz" "$DOWNLOAD_URL"
+VERSION=$(curl -s https://api.github.com/repos/itradeicu/itrade/releases/latest | grep -o '"tag_name": "[^"]*' | cut -d'"' -f4)
 
-echo -e "   ${YELLOW}- 正在解压...${NC}"
-# 尝试 tar 解压，如果失败则尝试 unzip
-if tar -xzf "$WORK_DIR/release.tar.gz" -C "$WORK_DIR" --strip-components=1 2>/dev/null; then
-    echo -e "   ${GREEN}- 解压成功 (tar)${NC}"
-elif unzip -o "$WORK_DIR/release.tar.gz" -d "$WORK_DIR" 2>/dev/null; then
-    echo -e "   ${GREEN}- 解压成功 (zip)${NC}"
-else
-    echo -e "   ${RED}[错误] 解压失败，请检查下载的文件是否完整。${NC}"
+if [ -z "$VERSION" ]; then
+    echo -e "${RED}[错误] 无法获取最新版本，请检查网络连接${NC}"
     exit 1
 fi
 
-cd "$WORK_DIR"
-echo ""
+echo -e "${GREEN}最新版本: ${VERSION}${NC}"
 
 # ==========================================
-# 5. 使用 uv 同步依赖
+# 4. 下载并解压
 # ==========================================
-echo -e "${BLUE}=> [5/6] 正在同步项目依赖...${NC}"
-if [ -f "pyproject.toml" ]; then
-    echo -e "   ${YELLOW}- 发现 pyproject.toml，正在执行 uv sync...${NC}"
-    uv sync
-    echo -e "   ${GREEN}- 依赖同步完成${NC}"
-else
-    echo -e "   ${YELLOW}- 未发现 pyproject.toml，跳过 uv 依赖同步。${NC}"
-fi
-echo ""
+echo -e "\n${YELLOW}=> [4/5] 下载 iTrade ${VERSION}...${NC}"
 
-# ==========================================
-# 6. 启动 Docker
-# ==========================================
-echo -e "${BLUE}=> [6/6] 正在启动 Docker 容器...${NC}"
-if ! command -v docker &>/dev/null; then
-    echo -e "   ${RED}[错误] 未检测到 Docker，请先安装 Docker Desktop 或 Docker Engine。${NC}"
-    echo -e "   ${YELLOW}提示: 可以访问 https://www.docker.com/products/docker-desktop/ 下载安装${NC}"
+DOWNLOAD_URL="https://github.com/itradeicu/itrade/releases/download/${VERSION}/iTrade-Docker-${ARCH_NAME}.zip"
+PACKAGE_NAME="iTrade-Docker-${ARCH_NAME}.zip"
+
+# 创建临时目录
+TEMP_DIR=$(mktemp -d)
+cd "$TEMP_DIR"
+
+echo -e "下载地址: ${DOWNLOAD_URL}"
+echo -e "正在下载... (请耐心等待)"
+
+curl -L -o "$PACKAGE_NAME" "$DOWNLOAD_URL"
+
+if [ ! -f "$PACKAGE_NAME" ] || [ ! -s "$PACKAGE_NAME" ]; then
+    echo -e "${RED}[错误] 下载失败${NC}"
     exit 1
 fi
 
-# 检查 Docker 是否正在运行
-if ! docker info &>/dev/null; then
-    echo -e "   ${RED}[错误] Docker 未运行，请先启动 Docker 服务。${NC}"
+echo -e "${GREEN}下载完成！正在解压...${NC}"
+
+# 解压
+unzip -o "$PACKAGE_NAME"
+
+# 切换到解压目录
+EXTRACTED_DIR=$(find . -maxdepth 1 -type d -name "iTrade-*" | head -1)
+if [ -z "$EXTRACTED_DIR" ]; then
+    echo -e "${RED}[错误] 解压失败，未找到目录${NC}"
     exit 1
 fi
 
-echo -e "   ${GREEN}- Docker 已就绪${NC}"
+cd "$EXTRACTED_DIR"
 
-if [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ]; then
-    echo -e "   ${YELLOW}- 使用 Docker Compose 启动...${NC}"
-    if docker compose version &>/dev/null; then
-        docker compose up -d
-    elif command -v docker-compose &>/dev/null; then
-        docker-compose up -d
-    else
-        echo -e "   ${RED}[错误] 找不到 docker compose 命令，请检查 Docker 安装是否完整。${NC}"
-        exit 1
-    fi
-    echo -e "   ${GREEN}- Docker Compose 启动成功${NC}"
-else
-    echo -e "   ${YELLOW}- 未找到 docker-compose 文件，尝试通过 Dockerfile 直接构建...${NC}"
-    if [ -f "Dockerfile" ]; then
-        docker build -t itrade-icu .
-        docker run -d --name itrade-icu -p 8080:8080 itrade-icu
-        echo -e "   ${GREEN}- Docker 容器启动成功${NC}"
-    else
-        echo -e "   ${RED}[错误] 未找到 Dockerfile 或 docker-compose.yml，无法启动容器。${NC}"
-        exit 1
-    fi
-fi
+echo -e "${GREEN}安装文件已准备好！${NC}"
 
-echo ""
+# ==========================================
+# 5. 启动服务
+# ==========================================
+echo -e "\n${YELLOW}=> [5/5] 启动 Docker 服务...${NC}"
+
+# 创建数据目录
+mkdir -p data
+
+# 自动生成 .env 文件设置宿主机 IP
+HOST_IP=$(hostname -I | awk '{print $1}')
+echo "HOST_IP=$HOST_IP" > .env
+
+# 启动服务
+docker compose up -d
+
+# 清理临时目录
+rm -rf "$TEMP_DIR"
+
+echo -e "\n${GREEN}=================================================${NC}"
+echo -e "${GREEN}  🎉 部署大功告成！${NC}"
 echo -e "${GREEN}=================================================${NC}"
-echo -e "${GREEN}  ✅ 部署完成！${NC}"
-echo -e "${GREEN}  iTrade.icu 的 Docker 服务已在后台启动。${NC}"
-echo -e "${GREEN}=================================================${NC}"
-echo ""
-echo -e "${BLUE}提示:${NC}"
-echo -e "  - 查看日志: ${YELLOW}docker logs -f itrade-icu${NC}"
-echo -e "  - 停止服务: ${YELLOW}docker compose down${NC} 或 ${YELLOW}docker stop itrade-icu${NC}"
-echo -e "  - 重启服务: ${YELLOW}docker compose restart${NC} 或 ${YELLOW}docker restart itrade-icu${NC}"
-echo ""
+echo -e "访问地址: ${YELLOW}https://${HOST_IP}/zh-CN/login${NC}"
+echo -e ""
+echo -e "常用命令:"
+echo -e "  查看日志: ${YELLOW}docker logs -f itrade-icu${NC}"
+echo -e "  停止服务: ${YELLOW}docker compose down${NC}"
+echo -e "  重启服务: ${YELLOW}docker compose restart${NC}"
