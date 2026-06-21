@@ -17,7 +17,7 @@ iTrade는 **Linux / macOS / Windows** 플랫폼을 지원하는 원클릭 설치
 터미널을 열고 다음 명령을 실행하면 다운로드, 설치, 시작이 한 번에 완료됩니다:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | sudo bash
 ```
 
 > 💡 **팁**:

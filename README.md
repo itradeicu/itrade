@@ -17,7 +17,7 @@ iTrade provides cross-platform one-click installation scripts supporting **Linux
 Open your terminal and run the following command for one-click download, installation, and launch:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | sudo bash
 ```
 
 > 💡 **Tips**:

@@ -29,7 +29,7 @@ iTrade 提供跨平台的一键安装脚本，支持 **Linux / macOS / Windows**
 打开终端，执行以下命令即可一键下载、安装并启动：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | sudo bash
 ```
 
 > 💡 **提示**：

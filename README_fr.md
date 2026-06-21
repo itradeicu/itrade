@@ -17,7 +17,7 @@ iTrade fournit des scripts d'installation en un clic multiplateformes prenant en
 Ouvrez votre terminal et exécutez la commande suivante pour télécharger, installer et lancer en un clic :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/itradeicu/itrade/main/install.sh | sudo bash
 ```
 
 > 💡 **Conseils** :
