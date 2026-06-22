@@ -46,14 +46,14 @@ check_os() {
 # ==========================================
 # 函数：检查权限
 # ==========================================
-# check_permission() {
-#     if [ "$EUID" -ne 0 ]; then
-#         echo -e "${CLR_ERROR}❌ 请使用 sudo 或 root 权限运行此脚本！${CLR_RESET}"
-#         echo "示例: sudo bash install.sh"
-#         exit 1
-#     fi
-#     echo -e "${CLR_SUCCESS}✅ 权限检查通过${CLR_RESET}"
-# }
+check_permission() {
+    if [ "$EUID" -ne 0 ]; then
+        echo -e "${CLR_ERROR}❌ 请使用 sudo 或 root 权限运行此脚本！${CLR_RESET}"
+        echo "示例: sudo bash install.sh"
+        exit 1
+    fi
+    echo -e "${CLR_SUCCESS}✅ 权限检查通过${CLR_RESET}"
+}
 
 # ==========================================
 # 函数：检查并安装 tar
@@ -253,13 +253,13 @@ download_and_extract() {
 start_docker_services() {
     echo -e "\n${CLR_BORDER}┌────────────────────────────────────────────────────────┐${CLR_RESET}"
     echo -e "${CLR_BORDER}│${CLR_RESET}  ${CLR_TITLE}🚀  iTrade Docker Compose 启动${CLR_RESET}                ${CLR_BORDER}│${CLR_RESET}"
-    echo -e "${CLR_BORDER}┌─────────────────── 📢 官方服务渠道 ────────────────────┐${CLR_RESET}"
+    echo -e "${CLR_BORDER}├─────────────────── 📢 官方服务渠道 ────────────────────┤${CLR_RESET}"
     echo -e "${CLR_BORDER}│${CLR_RESET}  ${CLR_SUCCESS}🌐 官方网站:${CLR_RESET}  https://itrade.icu                     ${CLR_BORDER}│${CLR_RESET}"
     echo -e "${CLR_BORDER}│${CLR_RESET}  ${CLR_SUCCESS}📖 文档中心:${CLR_RESET}  https://docs.itrade.icu                ${CLR_BORDER}│${CLR_RESET}"
     echo -e "${CLR_BORDER}└────────────────────────────────────────────────────────┘${CLR_RESET}"
     echo ""
 
-    echo -e "${CLR_BORDER}🔵 正在启动容器（请耐心等待）...${CLR_RESET}"
+    echo -e "${CLR_BORDER}🔵 正在下载依赖并启动容器（请耐心等待预计3-10分钟取决于网速）...${CLR_RESET}"
     
     # 进入安装目录执行 docker compose
     cd "${INSTALL_DIR}/iTrade-Docker-${ARCH_NAME}-v${VERSION}"
@@ -315,7 +315,7 @@ main() {
     echo -e ""
 
     check_os
-    # check_permission
+    check_permission
     check_and_install_tar
     check_and_install_docker
     check_docker_compose
