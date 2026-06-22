@@ -289,17 +289,18 @@ show_install_result() {
     echo -e "${CLR_SUCCESS}█████████████████████████████████████████████████████████${CLR_RESET}"
     echo -e ""
     echo -e "${CLR_TITLE}📦 安装信息${CLR_RESET}"
-    echo -e "  ${CLR_TEXT}• 访问地址: ${CLR_INFO}https://127.0.0.1"
+    echo -e "  ${CLR_TEXT}• 访问地址: ${CLR_INFO}https://127.0.0.1${CLR_RESET}"
     echo -e "  ${CLR_TEXT}• 安装目录: ${CLR_INFO}${INSTALL_DIR}/iTrade-Docker-${ARCH_NAME}-v${VERSION}${CLR_RESET}"
     echo -e "  ${CLR_TEXT}• 版本:     ${CLR_INFO}v${VERSION}${CLR_RESET}"
     echo -e ""
     echo -e "${CLR_TITLE}🔍 常用命令${CLR_RESET}"
     echo -e "  ${CLR_TEXT}• 查看日志: ${CLR_INFO}sudo docker logs -f itrade-icu${CLR_RESET}"
-    echo -e "  ${CLR_TEXT}• 启动服务: sudo ${CLR_INFO}docker compose up -d${CLR_RESET}"
-    echo -e "  ${CLR_TEXT}• 停止服务: sudo ${CLR_INFO}docker compose down${CLR_RESET}"
-    echo -e "  ${CLR_TEXT}• 重启服务: sudo ${CLR_INFO}docker compose restart${CLR_RESET}"
-    echo -e "  ${CLR_TEXT}• 卸载服务: sudo ${CLR_INFO}docker compose down && cd .. && rm -rf iTrade-Docker-${ARCH_NAME}-v${VERSION}${CLR_RESET}"
+    echo -e "  ${CLR_TEXT}• 启动服务: ${CLR_INFO}sudo docker compose up -d${CLR_RESET}"
+    echo -e "  ${CLR_TEXT}• 停止服务: ${CLR_INFO}sudo docker compose down${CLR_RESET}"
+    echo -e "  ${CLR_TEXT}• 重启服务: ${CLR_INFO}sudo docker compose restart${CLR_RESET}"
+    echo -e "  ${CLR_TEXT}• 卸载服务: ${CLR_INFO}sudo docker compose down && cd .. && rm -rf iTrade-Docker-${ARCH_NAME}-v${VERSION}${CLR_RESET}"
     echo -e ""
+
 }
 
 # ==========================================
